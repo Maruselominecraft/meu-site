@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz - PH</title>
+    <style>
+        body {
+            background-color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .container {
+            width: 50%;
+            margin: auto;
+        }
+        .question {
+            margin: 20px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .options button {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        .selected {
+            background-color: lightblue;
+        }
+        .majority {
+            font-size: 14px;
+            color: gray;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="station-title">PH</h1>
+    <div class="container">
+        <div id="quiz"></div>
+        <button id="submit-btn" onclick="submitAnswers()">Enviar Respostas</button>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function calculateStation() {
+            const startDate = new Date(2025, 2, 10); // 10 de março de 2025 (segunda-feira)
+            const today = new Date();
+            
+            // Zerar horas, minutos e segundos para evitar erros
+            startDate.setHours(0, 0, 0, 0);
+            today.setHours(0, 0, 0, 0);
+
+            // Calcular quantas segundas-feiras passaram desde a data inicial
+            const weeksPassed = Math.floor((today - startDate) / (7 * 24 * 60 * 60 * 1000));
+
+            // PH inicial é 2, aumentando a cada semana
+            const currentStation = `PH ${weeksPassed + 2}`;
+            document.getElementById("station-title").innerText = currentStation;
+        }
+
+        function loadQuiz() {
+            const quizDiv = document.getElementById("quiz");
+            for (let i = 1; i <= 30; i++) {
+                let questionHTML = `
+                    <div class='question'>Pergunta ${i} <span class='majority' id='majority-${i}'>Maioria: -</span></div>
+                    <div class='options' id='options-${i}'>
+                        <button onclick="selectAnswer(${i}, 'A')" id="q${i}-A">A</button>
+                        <button onclick="selectAnswer(${i}, 'B')" id="q${i}-B">B</button>
+                        <button onclick="selectAnswer(${i}, 'C')" id="q${i}-C">C</button>
+                        <button onclick="selectAnswer(${i}, 'D')" id="q${i}-D">D</button>
+                    </div>`;
+                quizDiv.innerHTML += questionHTML;
+            }
+        }
+
+        let userAnswers = {};
+        function selectAnswer(questionIndex, answer) {
+            userAnswers[questionIndex] = answer;
+            document.querySelectorAll(`#options-${questionIndex} button`).forEach(btn => btn.classList.remove("selected"));
+            document.getElementById(`q${questionIndex}-${answer}`).classList.add("selected");
+        }
+
+        function submitAnswers() {
+            document.getElementById("submit-btn").disabled = true;
+            fetch('https://api.ipify.org?format=json')
+                .then(response => response.json())
+                .then(data => {
+                    let userIP = data.ip;
+                    fetch('/submit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ip: userIP, answers: userAnswers })
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        localStorage.setItem("quizCompleted", "true");
+                        updateMajorityResults(result);
+                        disableQuiz();
+                    });
+                });
+        }
+
+        function updateMajorityResults(results) {
+            results.forEach((res, index) => {
+                document.getElementById(`majority-${index}`).innerText = `Maioria: ${res}`;
+            });
+        }
+
+        function disableQuiz() {
+            document.getElementById("submit-btn").style.display = "none";
+            document.querySelectorAll(".options button").forEach(btn => btn.disabled = true);
+        }
+
+        function checkIfCompleted() {
+            if (localStorage.getItem("quizCompleted") === "true") {
+                disableQuiz();
+                fetch('/results')
+                    .then(response => response.json())
+                    .then(result => updateMajorityResults(result));
+            }
+        }
+
+        loadQuiz();
+        calculateStation();
+        checkIfCompleted();
+    </script>
+</body>
+</html>
